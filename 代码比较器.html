@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>代码比较器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f7fa;
+            color: #333;
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            color: #2c3e50;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #7f8c8d;
+            font-size: 1.1rem;
+        }
+
+        .editor-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            height: 60vh;
+        }
+
+        .code-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .panel-header {
+            background-color: #ecf0f1;
+            padding: 12px 15px;
+            font-weight: bold;
+            font-size: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .panel-header span {
+            color: #2c3e50;
+        }
+
+        textarea {
+            width: 100%;
+            height: 100%;
+            border: none;
+            resize: none;
+            padding: 15px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            background-color: #fdfdfd;
+            tab-size: 4; /* For consistent tab width */
+        }
+
+        textarea:focus {
+            outline: none;
+            background-color: #fff9e6; /* Subtle highlight on focus */
+        }
+
+        .diff-container {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            margin-top: 20px;
+        }
+
+        .diff-header {
+            background-color: #ecf0f1;
+            padding: 12px 15px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        #diff-output {
+            min-height: 300px;
+            padding: 15px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            white-space: pre-wrap; /* Allows wrapping and preserves whitespace */
+            background-color: #fdfdfd;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        button {
+            padding: 12px 24px;
+            font-size: 1rem;
+            font-weight: 600;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        #compare-btn {
+            background-color: #3498db;
+            color: white;
+        }
+
+        #compare-btn:hover {
+            background-color: #2980b9;
+        }
+
+        #clear-btn {
+            background-color: #e74c3c;
+            color: white;
+        }
+
+        #clear-btn:hover {
+            background-color: #c0392b;
+        }
+
+        /* Diff-specific styling for the output */
+        .diff-ins { background-color: #d4edda; }
+        .diff-del { background-color: #f8d7da; text-decoration: line-through; }
+        .diff-eq {  }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1>代码比较器</h1>
+            <p class="subtitle">并排输入代码片段，并查看它们的差异</p>
+        </header>
+
+        <div class="controls">
+            <button id="compare-btn">比较代码</button>
+            <button id="clear-btn">清空全部</button>
+        </div>
+
+        <div class="editor-container">
+            <div class="code-panel">
+                <div class="panel-header">
+                    <span>代码版本 1 (旧)</span>
+                </div>
+                <textarea id="code-left" placeholder="// 在此输入第一个代码版本&#10;function hello() {&#10;    console.log('Hello');&#10;}&#10;..."></textarea>
+            </div>
+            <div class="code-panel">
+                <div class="panel-header">
+                    <span>代码版本 2 (新)</span>
+                </div>
+                <textarea id="code-right" placeholder="// 在此输入第二个代码版本&#10;function hello(name) {&#10;    console.log('Hello ' + name);&#10;}&#10;..."></textarea>
+            </div>
+        </div>
+
+        <div class="diff-container">
+            <div class="diff-header">差异对比结果</div>
+            <pre id="diff-output">请在上方输入代码并点击“比较代码”按钮。</pre>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/diff/5.0.0/diff.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const btnCompare = document.getElementById('compare-btn');
+            const btnClear = document.getElementById('clear-btn');
+            const codeLeft = document.getElementById('code-left');
+            const codeRight = document.getElementById('code-right');
+            const diffOutput = document.getElementById('diff-output');
+
+            // 比较按钮事件
+            btnCompare.addEventListener('click', () => {
+                const text1 = codeLeft.value;
+                const text2 = codeRight.value;
+
+                if (text1 === '' && text2 === '') {
+                    diffOutput.innerHTML = '请输入至少一个代码版本进行比较。';
+                    diffOutput.style.color = '#e74c3c';
+                    return;
+                }
+
+                diffOutput.style.color = ''; // Reset color
+                
+                // 使用 google-diff-match-patch 库进行行级别比较
+                // 这里使用 jsdiff 库作为替代，它也提供了强大的文本比较功能
+                const d = JsDiff.diffLines(text1, text2);
+
+                let resultHtml = '';
+                d.forEach((part) => {
+                    const escapedText = part.value
+                        .replace(/&/g, '&amp;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;')
+                        .replace(/\n/g, '<br>'); // Handle newlines for HTML
+
+                    if (part.added) {
+                        resultHtml += `<span class="diff-ins">${escapedText}</span>`;
+                    } else if (part.removed) {
+                        resultHtml += `<span class="diff-del">${escapedText}</span>`;
+                    } else {
+                        resultHtml += `<span class="diff-eq">${escapedText}</span>`;
+                    }
+                });
+
+                diffOutput.innerHTML = resultHtml || '两个代码版本完全相同。';
+            });
+
+            // 清空按钮事件
+            btnClear.addEventListener('click', () => {
+                codeLeft.value = '';
+                codeRight.value = '';
+                diffOutput.innerHTML = '请在上方输入代码并点击“比较代码”按钮。';
+                diffOutput.style.color = '';
+            });
+        });
+    </script>
+
+</body>
+</html>
